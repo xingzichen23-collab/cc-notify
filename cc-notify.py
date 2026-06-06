@@ -190,24 +190,75 @@ def send_notification(config: dict, title: str, lines: list[str]):
 
 def handle_userpromptsubmit(input_data: dict):
     """UserPromptSubmit: 保存用户原始提问作为任务名"""
-    user_prompt = input_data.get("user_prompt", "").strip()
+    # Claude Code hook 实际字段名是 "prompt"，不是 "user_prompt"
+    user_prompt = input_data.get("prompt", "").strip()
     if user_prompt:
         save_prompt(user_prompt)
 
 
+# 永远安全的工具——纯读取，不通知
+ALWAYS_SILENT = {"Read", "Glob", "Grep", "Task", "TaskList", "TaskGet",
+                 "TaskCreate", "TaskUpdate", "TaskOutput", "TaskStop",
+                 "EnterPlanMode", "ExitPlanMode", "CronList",
+                 "Skill", "AskUserQuestion"}
+
+# acceptEdits 模式下自动放行的编辑工具，不通知
+ACCEPT_EDIT_SILENT = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+
+
+def should_notify(input_data: dict) -> bool:
+    """判断当前工具是否需要通知用户"""
+    tool_name = input_data.get("tool_name", "")
+    if not tool_name:
+        return False
+    # 纯读取/查询类工具永远不通知
+    if tool_name in ALWAYS_SILENT:
+        return False
+    # acceptEdits 模式下，编辑工具自动放行
+    permission_mode = input_data.get("permission_mode", "")
+    if permission_mode == "acceptEdits" and tool_name in ACCEPT_EDIT_SILENT:
+        return False
+    return True
+
+
 def handle_pretooluse(input_data: dict):
-    """PreToolUse: 记录待处理的工具调用"""
+    """PreToolUse: 有风险的操作立即通知，安全操作只写状态"""
+    config = load_config()
+    if config is None or not config.get("enabled", True):
+        return
+
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
-    if tool_name:
-        save_state({
-            "tool_name": tool_name,
-            "tool_summary": summarize_tool(tool_name, tool_input),
-        })
+    if not tool_name:
+        return
+
+    tool_summary = summarize_tool(tool_name, tool_input)
+    save_state({
+        "tool_name": tool_name,
+        "tool_summary": tool_summary,
+    })
+
+    if not should_notify(input_data):
+        return  # 安全工具，不发通知
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    task_name = load_prompt()
+    if task_name:
+        title = f"⏳ 待处理 — {task_name}"
+    else:
+        title = "⏳ Claude Code — 待处理操作"
+    lines = [
+        f"**操作**：{tool_summary}",
+        f"**时间**：{now}",
+        "",
+        "---",
+        "请回到终端确认此操作",
+    ]
+    send_notification(config, title, lines)
 
 
 def handle_stop(input_data: dict):
-    """Stop: 判断是"待确权"还是"任务完成"并发送通知"""
+    """Stop: 任务处理完毕，发送完成通知"""
     config = load_config()
     if config is None or not config.get("enabled", True):
         clear_state()
@@ -218,38 +269,26 @@ def handle_stop(input_data: dict):
     state = load_state()
 
     if state is not None:
-        # ── 有待处理的工具 → 需要用户确权 ──
-        tool_summary = state.get("tool_summary", "未知操作")
-        if task_name:
-            title = f"⏳ 待处理 — {task_name}"
-        else:
-            title = "⏳ Claude Code — 待处理操作"
-        lines = [
-            f"**操作**：{tool_summary}",
-            f"**时间**：{now}",
-            "",
-            "---",
-            "请回到终端确认此操作",
-        ]
+        # 工具被阻止（用户拒绝），通知已在 PreToolUse 时发过
         clear_state()
-    else:
-        # ── 无待处理工具 → 任务处理完毕 ──
-        if task_name:
-            title = f"✅ 处理完毕 — {task_name}"
-        else:
-            title = "✅ Claude Code — 任务处理完毕"
-        lines = [
-            f"**时间**：{now}",
-            "",
-            "---",
-            "可以查看结果或继续下一步",
-        ]
+        return
 
+    # 无待处理工具 → 任务处理完毕
+    if task_name:
+        title = f"✅ 处理完毕 — {task_name}"
+    else:
+        title = "✅ Claude Code — 任务处理完毕"
+    lines = [
+        f"**时间**：{now}",
+        "",
+        "---",
+        "可以查看结果或继续下一步",
+    ]
     send_notification(config, title, lines)
 
 
 def handle_posttooluse(input_data: dict):
-    """PostToolUse: 清理状态文件（工具已执行完毕）"""
+    """PostToolUse: 清理状态文件（工具自动放行/已执行完毕）"""
     clear_state()
 
 
