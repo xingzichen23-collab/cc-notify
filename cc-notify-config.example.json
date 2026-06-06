@@ -1,5 +1,5 @@
 {
   "platform": "feishu",
-  "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/your-webhook-key-here",
+  "webhook_url": "https://open.feishu.cn/open-apis/bot/v2/hook/你的飞书机器人webhook地址",
   "enabled": true
 }

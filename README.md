@@ -21,26 +21,43 @@ PostToolUse      → 清理状态
 
 ## 快速开始
 
-### 1. 创建飞书机器人
+### 方式一：让 Claude Code 帮你安装（推荐）
+
+直接对 Claude Code 说：
+
+> 帮我安装 cc-knock 通知工具，仓库地址是 https://github.com/xingzichen23-colla/cc-knock ，我的飞书 Webhook 是 https://open.feishu.cn/open-apis/bot/v2/hook/你的key
+
+Claude Code 会自动完成以下所有步骤：
+1. 克隆仓库到本地
+2. 复制脚本到 `~/.claude/scripts/`
+3. 创建配置文件并填入你的 Webhook URL
+4. 在 `~/.claude/settings.json` 中配置四个 Hook
+5. 发送测试消息验证
+
+你只需要提前准备好飞书机器人的 Webhook URL 即可。
+
+### 方式二：手动安装
+
+#### 1. 创建飞书机器人
 
 飞书群 → 设置 → 群机器人 → 添加机器人 → 自定义机器人 → 复制 Webhook URL
 
-### 2. 安装
+#### 2. 安装
 
 ```bash
 # 克隆仓库
-git clone <your-repo-url> ~/projects/cc-notify
+git clone https://github.com/xingzichen23-colla/cc-knock.git ~/projects/cc-knock
 
 # 复制脚本到 Claude Code 目录
 mkdir -p ~/.claude/scripts
-cp ~/projects/cc-notify/cc-notify.py ~/.claude/scripts/cc-notify.py
+cp ~/projects/cc-knock/cc-notify.py ~/.claude/scripts/cc-notify.py
 
 # 创建配置文件，填入你的 Webhook URL
-cp ~/projects/cc-notify/cc-notify-config.example.json ~/.claude/cc-notify-config.json
+cp ~/projects/cc-knock/cc-notify-config.example.json ~/.claude/cc-notify-config.json
 # 编辑 ~/.claude/cc-notify-config.json，填入真实的 webhook_url
 ```
 
-### 3. 配置 Claude Code Hooks
+#### 3. 配置 Claude Code Hooks
 
 在 `~/.claude/settings.json` 中添加：
 
@@ -55,7 +72,7 @@ cp ~/projects/cc-notify/cc-notify-config.example.json ~/.claude/cc-notify-config
 }
 ```
 
-### 4. 测试
+#### 4. 测试
 
 ```bash
 # 模拟完整流程
@@ -65,7 +82,7 @@ echo '{"hook_event_name":"Stop","reason":""}' | python ~/.claude/scripts/cc-noti
 echo '{"hook_event_name":"Stop","reason":""}' | python ~/.claude/scripts/cc-notify.py --event stop
 ```
 
-成功的话，飞书会收到两条消息。
+成功的话，飞书会收到两条消息（⏳ 待处理 + ✅ 处理完毕）。
 
 ## 配置说明
 
@@ -88,7 +105,7 @@ echo '{"hook_event_name":"Stop","reason":""}' | python ~/.claude/scripts/cc-noti
 ## 文件说明
 
 ```
-cc-notify/
+cc-knock/
 ├── README.md                        # 本文件
 ├── cc-notify.py                     # 核心脚本（纯标准库，零依赖）
 ├── cc-notify-config.example.json    # 配置文件模板
